@@ -101,20 +101,7 @@ def main():
         print("   MAX_TOKENS=2048")
         sys.exit(1)
     
-    # Check if API_URL is configured
-    try:
-        from config import get_config
-        config = get_config()
-        if not config.validate():
-            print("❌ Configuration validation failed!")
-            print("💡 Please check your .env file and ensure API_URL is set correctly")
-            sys.exit(1)
-    except Exception as e:
-        print(f"⚠️  Configuration error: {e}")
-        print("💡 Please check your .env file")
-        sys.exit(1)
-    
-    print("✅ Configuration validated successfully!")
+    print("✅ Setup complete! Launching application...")
     print()
     
     # Launch the UI

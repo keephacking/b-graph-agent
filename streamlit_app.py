@@ -46,12 +46,6 @@ class StreamlitChatApp:
                         return False
                     
                     self.api_client = APIClient()
-                    
-                    # Test API connection
-                    if not self.api_client.test_connection():
-                        st.error("❌ Failed to connect to API. Please check your API URL.")
-                        return False
-                    
                     self.graph_generator = GraphGenerator()
                     self.html_generator = HTMLGenerator()
                     

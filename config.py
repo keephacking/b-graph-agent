@@ -48,9 +48,8 @@ class Config:
     def validate(self) -> bool:
         """Validate configuration settings"""
         try:
-            # Check if API URL is set
-            if not self.api_url or self.api_url == "your_api_url_here":
-                raise ValueError("Please set a valid API_URL in your .env file")
+            # Only validate numeric values, not API URL
+            # API URL validation will happen during actual API calls
             
             # Validate numeric values
             if self.temperature < 0 or self.temperature > 2:
