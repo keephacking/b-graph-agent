@@ -4,6 +4,7 @@ Handles POST requests to external API endpoint with custom payload structure.
 """
 
 import json
+import re
 import requests
 from typing import Dict, Any, Optional
 from config import get_config
@@ -49,7 +50,15 @@ class APIClient:
         except Exception as e:
             if self.config.debug:
                 print(f"❌ Error generating content: {str(e)}")
-            raise Exception(f"Failed to generate data: {str(e)}")
+            
+            # Provide more specific error messages
+            error_msg = str(e)
+            if "API request failed" in error_msg:
+                raise Exception(f"❌ **API Connection Error**\n\n{error_msg}\n\n💡 **Please check:**\n- Your API_URL is correct\n- The API endpoint is accessible\n- Your internet connection")
+            elif "Failed to parse" in error_msg:
+                raise Exception(f"❌ **API Response Error**\n\n{error_msg}\n\n💡 **The API returned an unexpected response format**")
+            else:
+                raise Exception(f"❌ **Chart Generation Error**\n\n{error_msg}")
     
     def _create_payload(self, user_prompt: str, chart_type: Optional[str] = None) -> Dict[str, Any]:
         """Create the payload structure as specified"""
@@ -166,7 +175,6 @@ Response:
                 response_text = str(response)
             
             # Try to extract JSON from response
-            import re
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
@@ -192,23 +200,20 @@ Response:
                 return parsed_data
             
             else:
-                # Fallback: try to extract data from natural language response
-                return self._extract_data_from_text(response_text, user_prompt, chart_type)
+                # No JSON found in response
+                raise Exception(f"No valid JSON found in API response. Response: {response_text[:200]}...")
                 
         except json.JSONDecodeError as e:
+            error_msg = f"Failed to parse API response as JSON: {e}"
             if self.config.debug:
                 print(f"❌ JSON parsing error: {e}")
                 print(f"Response text: {str(response)[:500]}...")
-            
-            # Fallback to text extraction
-            return self._extract_data_from_text(str(response), user_prompt, chart_type)
+            raise Exception(f"{error_msg}\n\nAPI Response: {str(response)[:200]}...")
         
         except Exception as e:
             if self.config.debug:
                 print(f"❌ Response parsing error: {e}")
-            
-            # Return minimal valid response
-            return self._create_fallback_response(str(response), user_prompt, chart_type)
+            raise Exception(f"Failed to parse API response: {str(e)}")
     
     def _detect_chart_type_from_prompt(self, user_prompt: str, explicit_chart_type: Optional[str] = None) -> str:
         """Detect chart type from user prompt or explicit type"""
@@ -235,64 +240,6 @@ Response:
         else:
             return 'bar'  # Final fallback
     
-    def _extract_data_from_text(self, text: str, user_prompt: str = "", chart_type: Optional[str] = None) -> Dict[str, Any]:
-        """Extract data from natural language response (fallback method)"""
-        
-        import re
-        # Try to find numbers in the text
-        numbers = re.findall(r'\b\d+(?:\.\d+)?\b', text)
-        
-        if len(numbers) >= 3:
-            # Create simple data structure
-            values = [float(num) for num in numbers[:10]]  # Limit to 10 values
-            labels = [f"Item {i+1}" for i in range(len(values))]
-            
-            return {
-                'title': 'Generated Chart',
-                'description': 'Data extracted from response',
-                'chart_type': self._detect_chart_type_from_prompt(user_prompt, chart_type),
-                'data': {
-                    'labels': labels,
-                    'datasets': [{
-                        'name': 'Data',
-                        'values': values
-                    }]
-                },
-                'chart_config': self._default_chart_config()
-            }
-        
-        # If no numbers found, create sample data
-        return self._create_sample_data(user_prompt, chart_type)
-    
-    def _create_fallback_response(self, original_text: str, user_prompt: str = "", chart_type: Optional[str] = None) -> Dict[str, Any]:
-        """Create a fallback response when parsing fails"""
-        
-        return {
-            'title': 'Generated Visualization',
-            'description': f'Based on: {original_text[:100]}...',
-            'chart_type': self._detect_chart_type_from_prompt(user_prompt, chart_type),
-            'data': self._create_sample_data(user_prompt, chart_type)['data'],
-            'chart_config': self._default_chart_config(),
-            'fallback': True,
-            'original_response': original_text
-        }
-    
-    def _create_sample_data(self, user_prompt: str = "", chart_type: Optional[str] = None) -> Dict[str, Any]:
-        """Create sample data when extraction fails"""
-        
-        return {
-            'title': 'Sample Data Visualization',
-            'description': 'Sample data generated due to parsing issues',
-            'chart_type': self._detect_chart_type_from_prompt(user_prompt, chart_type),
-            'data': {
-                'labels': ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-                'datasets': [{
-                    'name': 'Sample Data',
-                    'values': [10, 15, 8, 22, 18]
-                }]
-            },
-            'chart_config': self._default_chart_config()
-        }
     
     def _default_chart_config(self) -> Dict[str, Any]:
         """Return default chart configuration"""
