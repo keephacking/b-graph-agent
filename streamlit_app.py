@@ -81,9 +81,32 @@ class StreamlitChatApp:
             return None, None
     
     def display_chart_info(self, html_path: str, api_response: dict):
-        """Display chart information and actions"""
+        """Display chart information, analysis, and actions"""
         chart_type = api_response.get('chart_type', 'Unknown')
         data_points = len(api_response.get('data', {}).get('labels', []))
+        
+        # Display prediction analysis if available
+        prediction_analysis = api_response.get('prediction_analysis')
+        parsing_error = api_response.get('parsing_error', False)
+        
+        if prediction_analysis:
+            # Show different header based on whether there was a parsing error
+            if parsing_error:
+                st.subheader("🧠 AI Analysis (Chart parsing had issues)")
+                error_reason = api_response.get('error_reason', 'Unknown error')
+                st.warning(f"⚠️ {error_reason}, but AI analysis was successfully extracted.")
+            else:
+                st.subheader("🧠 AI Analysis")
+            
+            with st.expander("📝 View Detailed Analysis", expanded=True):
+                # Style the analysis text with better formatting
+                formatted_analysis = self._format_analysis_text(prediction_analysis)
+                st.markdown(formatted_analysis)
+            
+            st.divider()
+        
+        # Chart metrics section
+        st.subheader("📊 Chart Details")
         
         # Create columns for info display
         col1, col2, col3 = st.columns(3)
@@ -98,7 +121,42 @@ class StreamlitChatApp:
             file_size = Path(html_path).stat().st_size
             st.metric("💾 File Size", f"{file_size:,} bytes")
         
+        # Additional chart information
+        with st.expander("📋 Chart Configuration Details"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Chart Information:**")
+                st.write(f"• **Title:** {api_response.get('title', 'N/A')}")
+                st.write(f"• **Description:** {api_response.get('description', 'N/A')}")
+                st.write(f"• **Type:** {chart_type.title()}")
+                
+                # Data information
+                data = api_response.get('data', {})
+                labels = data.get('labels', [])
+                datasets = data.get('datasets', [])
+                
+                st.write(f"• **Labels:** {', '.join(labels[:3])}{'...' if len(labels) > 3 else ''}")
+                st.write(f"• **Datasets:** {len(datasets)} series")
+            
+            with col2:
+                st.write("**Chart Configuration:**")
+                chart_config = api_response.get('chart_config', {})
+                st.write(f"• **X-Axis:** {chart_config.get('x_axis_title', 'N/A')}")
+                st.write(f"• **Y-Axis:** {chart_config.get('y_axis_title', 'N/A')}")
+                st.write(f"• **Color Scheme:** {chart_config.get('color_scheme', 'N/A')}")
+                st.write(f"• **Show Legend:** {'Yes' if chart_config.get('show_legend', True) else 'No'}")
+                
+                # Show original prompt if available
+                original_prompt = api_response.get('original_prompt', '')
+                if original_prompt:
+                    st.write("**Original Request:**")
+                    st.write(f"*\"{original_prompt[:100]}{'...' if len(original_prompt) > 100 else ''}\"*")
+        
+        st.divider()
+        
         # Action buttons
+        st.subheader("🎯 Actions")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -132,6 +190,43 @@ class StreamlitChatApp:
         
         # Display file path
         st.info(f"📍 **File Location:** `{html_path}`")
+    
+    def _format_analysis_text(self, analysis_text: str) -> str:
+        """Format the analysis text for better display in Streamlit"""
+        
+        # Handle None or empty input
+        if not analysis_text:
+            return ""
+        
+        # Ensure we have a string
+        if not isinstance(analysis_text, str):
+            return str(analysis_text)
+        
+        # Split into paragraphs and format
+        paragraphs = analysis_text.split('\n\n')
+        formatted_paragraphs = []
+        
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+                
+            # Handle bullet points and lists
+            if paragraph.startswith('*') or paragraph.startswith('-'):
+                # Convert to markdown list
+                lines = paragraph.split('\n')
+                formatted_lines = []
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('*') or line.startswith('-'):
+                        formatted_lines.append(f"• {line[1:].strip()}")
+                    else:
+                        formatted_lines.append(line)
+                formatted_paragraphs.append('\n'.join(formatted_lines))
+            else:
+                formatted_paragraphs.append(paragraph)
+        
+        return '\n\n'.join(formatted_paragraphs)
 
 
 def main():
@@ -273,12 +368,15 @@ def main():
                 
                 # Success message
                 chart_type_display = api_response.get('chart_type', 'Unknown').title()
+                analysis_available = api_response.get('prediction_analysis') is not None
+                
                 success_message = f"""
                 🎉 **Chart Generated Successfully!**
                 
                 📊 **Chart Type:** {chart_type_display}
                 📈 **Data Points:** {len(api_response.get('data', {}).get('labels', []))}
                 💾 **Title:** {api_response.get('title', 'Generated Chart')}
+                {f"🧠 **AI Analysis:** Available below" if analysis_available else ""}
                 
                 Your interactive chart has been created and saved!
                 """

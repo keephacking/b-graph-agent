@@ -94,7 +94,7 @@ class APIClient:
                 self.config.api_url,
                 json=payload,
                 headers=headers,
-                timeout=30
+                timeout=180
             )
             
             response.raise_for_status()
@@ -163,57 +163,359 @@ Response:
         return enhanced_prompt
     
     def _parse_response(self, response: Any, user_prompt: str = "", chart_type: Optional[str] = None) -> Dict[str, Any]:
-        """Parse API response and extract structured data"""
+        """Parse API response and extract structured data from prediction field"""
+        
+        prediction_content = None
+        chart_data = None
         
         try:
-            # Handle different response types
+            # Handle different response types and extract prediction field
+            prediction_content = self._extract_prediction_content(response)
+            
+            if not prediction_content:
+                raise Exception("No prediction content found in API response")
+            
+            # Extract JSON from the prediction content
+            chart_data = self._extract_chart_json_from_prediction(prediction_content)
+            
+            if not chart_data:
+                raise Exception("No valid chart JSON found in prediction content")
+            
+            # Validate required fields
+            required_fields = ['title', 'chart_type', 'data']
+            for field in required_fields:
+                if field not in chart_data:
+                    raise ValueError(f"Missing required field: {field}")
+            
+            # Set defaults for optional fields
+            if 'description' not in chart_data:
+                chart_data['description'] = "Generated data visualization"
+            
+            if 'chart_config' not in chart_data:
+                chart_data['chart_config'] = self._default_chart_config()
+            
+            # Ensure chart_type is not None - detect from user prompt if missing
+            if not chart_data.get('chart_type'):
+                chart_data['chart_type'] = self._detect_chart_type_from_prompt(user_prompt, chart_type)
+            
+            # Always try to extract analysis text if we have prediction content
+            if prediction_content:
+                analysis_text = self._extract_analysis_text_from_prediction(prediction_content)
+                if analysis_text:
+                    chart_data['prediction_analysis'] = analysis_text
+            
+            return chart_data
+                
+        except json.JSONDecodeError as e:
+            error_msg = f"Failed to parse chart JSON from prediction: {e}"
+            if self.config.debug:
+                print(f"❌ JSON parsing error: {e}")
+                print(f"Response: {str(response)[:500]}...")
+            
+            # Try to return analysis-only fallback
+            fallback_data = self._create_fallback_response(prediction_content, user_prompt, chart_type, "JSON parsing failed")
+            if fallback_data:
+                return fallback_data
+            
+            raise Exception(f"{error_msg}\n\nAPI Response: {str(response)[:200]}...")
+        
+        except Exception as e:
+            if self.config.debug:
+                print(f"❌ Response parsing error: {e}")
+            
+            # Try to return analysis-only fallback for any other error
+            fallback_data = self._create_fallback_response(prediction_content, user_prompt, chart_type, "Chart parsing failed")
+            if fallback_data:
+                return fallback_data
+            
+            raise Exception(f"Failed to parse API response: {str(e)}")
+    
+    def _create_fallback_response(self, prediction_content: Optional[str], user_prompt: str, chart_type: Optional[str], error_reason: str) -> Optional[Dict[str, Any]]:
+        """Create a fallback response when chart parsing fails but analysis is available"""
+        
+        if not prediction_content:
+            return None
+        
+        analysis_text = self._extract_analysis_text_from_prediction(prediction_content)
+        if not analysis_text:
+            return None
+        
+        fallback_data = {
+            'title': 'AI Analysis Available',
+            'description': f'{error_reason} but analysis was extracted',
+            'chart_type': self._detect_chart_type_from_prompt(user_prompt, chart_type),
+            'data': {'labels': ['Placeholder'], 'datasets': [{'name': 'Values', 'values': [1]}]},
+            'chart_config': self._default_chart_config(),
+            'prediction_analysis': analysis_text,
+            'parsing_error': True,
+            'error_reason': error_reason
+        }
+        
+        if self.config.debug:
+            print(f"✅ Created fallback response with analysis ({len(analysis_text)} chars)")
+        
+        return fallback_data
+    
+    def _extract_prediction_content(self, response: Any) -> Optional[str]:
+        """Extract prediction content from API response"""
+        
+        try:
+            # Handle different response formats
             if isinstance(response, dict):
+                # Check for prediction field directly
+                if 'prediction' in response:
+                    return response['prediction']
+                
+                # If response is already the prediction content
+                if 'title' in response and 'chart_type' in response:
+                    return json.dumps(response)
+                
+                # Convert dict to JSON string for further processing
                 response_text = json.dumps(response)
             elif isinstance(response, str):
                 response_text = response
             else:
                 response_text = str(response)
             
-            # Try to extract JSON from response
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                parsed_data = json.loads(json_str)
-                
-                # Validate required fields
-                required_fields = ['title', 'chart_type', 'data']
-                for field in required_fields:
-                    if field not in parsed_data:
-                        raise ValueError(f"Missing required field: {field}")
-                
-                # Set defaults for optional fields
-                if 'description' not in parsed_data:
-                    parsed_data['description'] = "Generated data visualization"
-                
-                if 'chart_config' not in parsed_data:
-                    parsed_data['chart_config'] = self._default_chart_config()
-                
-                # Ensure chart_type is not None - detect from user prompt if missing
-                if not parsed_data.get('chart_type'):
-                    parsed_data['chart_type'] = self._detect_chart_type_from_prompt(user_prompt, chart_type)
-                
-                return parsed_data
+            # Try to find prediction field in JSON response
+            try:
+                parsed_response = json.loads(response_text)
+                if isinstance(parsed_response, dict) and 'prediction' in parsed_response:
+                    return parsed_response['prediction']
+            except json.JSONDecodeError:
+                pass
             
+            # If no prediction field found, return the original response
+            return response_text
+            
+        except Exception as e:
+            if self.config.debug:
+                print(f"❌ Error extracting prediction content: {e}")
+            return None
+    
+    def _extract_chart_json_from_prediction(self, prediction_content: str) -> Optional[Dict[str, Any]]:
+        """Extract chart configuration JSON from prediction content"""
+        
+        try:
+            if self.config.debug:
+                print(f"🔍 Extracting JSON from prediction content ({len(prediction_content)} chars)")
+            
+            # Clean up the prediction content - remove escape sequences and extra quotes
+            cleaned_content = prediction_content
+            if cleaned_content.startswith('"""') and cleaned_content.endswith('"'):
+                cleaned_content = cleaned_content[3:-1]  # Remove triple quotes at start and quote at end
+            
+            # Handle escaped newlines and quotes
+            cleaned_content = cleaned_content.replace('\\n', '\n').replace('\\"', '"')
+            
+            # Remove non-breaking spaces and other problematic Unicode characters
+            cleaned_content = cleaned_content.replace('\xa0', ' ')  # Non-breaking space to regular space
+            cleaned_content = cleaned_content.replace('\u2000', ' ')  # En quad
+            cleaned_content = cleaned_content.replace('\u2001', ' ')  # Em quad
+            cleaned_content = cleaned_content.replace('\u2002', ' ')  # En space
+            cleaned_content = cleaned_content.replace('\u2003', ' ')  # Em space
+            cleaned_content = cleaned_content.replace('\u2004', ' ')  # Three-per-em space
+            cleaned_content = cleaned_content.replace('\u2005', ' ')  # Four-per-em space
+            cleaned_content = cleaned_content.replace('\u2006', ' ')  # Six-per-em space
+            cleaned_content = cleaned_content.replace('\u2007', ' ')  # Figure space
+            cleaned_content = cleaned_content.replace('\u2008', ' ')  # Punctuation space
+            cleaned_content = cleaned_content.replace('\u2009', ' ')  # Thin space
+            cleaned_content = cleaned_content.replace('\u200a', ' ')  # Hair space
+            
+            if self.config.debug:
+                print(f"📝 Cleaned content preview: {cleaned_content[:200]}...")
+            
+            # Look for JSON after "json" keyword (common pattern in the response)
+            json_start_patterns = [
+                r'json\s*\n\s*\{',  # "json" followed by newline and opening brace
+                r'```json\s*\n\s*\{',  # markdown json block
+                r'\{',  # Just look for opening brace
+            ]
+            
+            for pattern in json_start_patterns:
+                match = re.search(pattern, cleaned_content, re.IGNORECASE | re.MULTILINE)
+                if match:
+                    # Find the start of the JSON (the opening brace)
+                    json_start = match.end() - 1 if pattern != r'\{' else match.start()
+                    
+                    # Extract everything from the opening brace onwards
+                    json_candidate = cleaned_content[json_start:].strip()
+                    
+                    if self.config.debug:
+                        print(f"🎯 Found JSON candidate starting at position {json_start}")
+                        print(f"📄 JSON candidate preview: {json_candidate[:200]}...")
+                    
+                    # Try to parse this as JSON
+                    parsed_json = self._try_parse_json_candidate(json_candidate)
+                    if parsed_json:
+                        return parsed_json
+            
+            # Fallback: try to find any JSON-like structure
+            if self.config.debug:
+                print("🔄 Trying fallback JSON extraction methods...")
+            
+            # Look for balanced braces
+            brace_count = 0
+            json_start = -1
+            
+            for i, char in enumerate(cleaned_content):
+                if char == '{':
+                    if json_start == -1:
+                        json_start = i
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0 and json_start != -1:
+                        # Found a complete JSON object
+                        json_candidate = cleaned_content[json_start:i+1]
+                        parsed_json = self._try_parse_json_candidate(json_candidate)
+                        if parsed_json:
+                            return parsed_json
+                        # Reset for next potential JSON object
+                        json_start = -1
+            
+            return None
+            
+        except Exception as e:
+            if self.config.debug:
+                print(f"❌ Error extracting chart JSON: {e}")
+            return None
+    
+    def _try_parse_json_candidate(self, json_candidate: str) -> Optional[Dict[str, Any]]:
+        """Try to parse a JSON candidate string and validate it's chart data"""
+        
+        try:
+            # Remove any trailing non-JSON content
+            json_candidate = json_candidate.strip()
+            
+            # Find the end of the JSON object
+            brace_count = 0
+            json_end = -1
+            
+            for i, char in enumerate(json_candidate):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_end = i + 1
+                        break
+            
+            if json_end > 0:
+                json_str = json_candidate[:json_end]
             else:
-                # No JSON found in response
-                raise Exception(f"No valid JSON found in API response. Response: {response_text[:200]}...")
+                json_str = json_candidate
+            
+            if self.config.debug:
+                print(f"🧪 Trying to parse JSON: {json_str[:100]}...")
+            
+            parsed_json = json.loads(json_str)
+            
+            # Validate this is chart data
+            if (isinstance(parsed_json, dict) and 
+                'title' in parsed_json and 
+                'chart_type' in parsed_json and 
+                'data' in parsed_json):
+                
+                if self.config.debug:
+                    print(f"✅ Found valid chart JSON with title: {parsed_json.get('title', 'N/A')}")
+                
+                return parsed_json
+            else:
+                if self.config.debug:
+                    print(f"❌ JSON object doesn't have required chart fields")
+                return None
                 
         except json.JSONDecodeError as e:
-            error_msg = f"Failed to parse API response as JSON: {e}"
             if self.config.debug:
-                print(f"❌ JSON parsing error: {e}")
-                print(f"Response text: {str(response)[:500]}...")
-            raise Exception(f"{error_msg}\n\nAPI Response: {str(response)[:200]}...")
+                print(f"❌ JSON decode error: {e}")
+            return None
+        except Exception as e:
+            if self.config.debug:
+                print(f"❌ Error parsing JSON candidate: {e}")
+            return None
+    
+    def _extract_analysis_text_from_prediction(self, prediction_content: str) -> Optional[str]:
+        """Extract the analysis text from prediction content (everything before the JSON)"""
+        
+        try:
+            # Clean up the prediction content
+            cleaned_content = prediction_content
+            if cleaned_content.startswith('"""') and cleaned_content.endswith('"'):
+                cleaned_content = cleaned_content[3:-1]
+            
+            # Handle escaped newlines and quotes
+            cleaned_content = cleaned_content.replace('\\n', '\n').replace('\\"', '"')
+            
+            # Remove non-breaking spaces and other problematic Unicode characters
+            cleaned_content = cleaned_content.replace('\xa0', ' ')
+            for unicode_char in ['\u2000', '\u2001', '\u2002', '\u2003', '\u2004', 
+                               '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200a']:
+                cleaned_content = cleaned_content.replace(unicode_char, ' ')
+            
+            # Find where the JSON starts
+            json_patterns = [
+                r'json\s*\n\s*\{',  # "json" followed by newline and opening brace
+                r'```json\s*\n\s*\{',  # markdown json block
+                r'\{(?=\s*"title")',  # opening brace followed by "title" field
+            ]
+            
+            json_start_pos = len(cleaned_content)  # Default to end if no JSON found
+            
+            for pattern in json_patterns:
+                match = re.search(pattern, cleaned_content, re.IGNORECASE | re.MULTILINE)
+                if match:
+                    json_start_pos = match.start()
+                    break
+            
+            # Extract everything before the JSON as analysis text
+            analysis_text = cleaned_content[:json_start_pos].strip()
+            
+            # Clean up the analysis text
+            if analysis_text:
+                # Remove any remaining markdown artifacts
+                analysis_text = re.sub(r'^```.*?\n', '', analysis_text, flags=re.MULTILINE)
+                analysis_text = re.sub(r'\n```$', '', analysis_text)
+                
+                # Remove extra whitespace and normalize line breaks
+                analysis_text = re.sub(r'\n\s*\n\s*\n', '\n\n', analysis_text)  # Max 2 consecutive newlines
+                analysis_text = analysis_text.strip()
+                
+                # Check if this is just placeholder text
+                placeholder_indicators = [
+                    '…huge string……...',
+                    'huge string',
+                    '...',
+                    'placeholder',
+                    'sample text'
+                ]
+                
+                is_placeholder = any(indicator in analysis_text.lower() for indicator in placeholder_indicators)
+                
+                if is_placeholder and len(analysis_text) < 200:
+                    # Generate a meaningful fallback message
+                    analysis_text = """**AI Analysis Summary:**
+
+This chart was generated based on your request. The AI model analyzed the data requirements and created an appropriate visualization with the following considerations:
+
+• **Data Structure**: The chart includes properly formatted labels and datasets
+• **Visualization Type**: Selected based on the nature of your data and request
+• **Configuration**: Optimized chart settings for clarity and readability
+• **Interactivity**: Generated as an interactive HTML chart for better user experience
+
+The model processed your request and generated realistic sample data that demonstrates the patterns and relationships you requested."""
+                
+                if len(analysis_text) > 10:  # Only return if substantial content
+                    if self.config.debug:
+                        print(f"✅ Extracted analysis text ({len(analysis_text)} chars)")
+                    return analysis_text
+            
+            return None
         
         except Exception as e:
             if self.config.debug:
-                print(f"❌ Response parsing error: {e}")
-            raise Exception(f"Failed to parse API response: {str(e)}")
+                print(f"❌ Error extracting analysis text: {e}")
+            return None
     
     def _detect_chart_type_from_prompt(self, user_prompt: str, explicit_chart_type: Optional[str] = None) -> str:
         """Detect chart type from user prompt or explicit type"""

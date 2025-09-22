@@ -1,0 +1,220 @@
+{
+  "prediction": "\"\"\"\nHere is a comprehensive analysis for part …huge string……...\n\njson\n{\n    \"title\": \" Rate by Shipping State for part: Tbxxx\",\n    \"description\": \"This chart compares the  Failure rate for parts shipped from different states. It highlights that Tex, Geora, and Nyz Jersey have significantly higher failure rates compared to the overall average and other locations.\",\n    \"chart_type\": \"bar\",\n    \"data\": {\n        \"labels\": [\"Tex (TE)\", \"Geora (GR)\", \"Nep Jer (NR)\", \"Overall Average\", \"Cali (CL)\"],\n        \"datasets\": [\n            {\n                \"name\": \" Rate (%)\",\n                \"values\": [15.2, 11.1, 9.5, 8.0, 3.5]\n            }\n        ]\n    },\n    \"chart_config\": {\n        \"x_axis_title\": \"Shipping State\",\n        \"y_axis_title\": \"Rate (%)\",\n        \"color_scheme\": \"viridis\",\n        \"show_legend\": false\n    }\n}\n",
+  "transactionMetadata": null,
+  "responseMetadata": {
+    "TransactionId": "",
+    "timeTaken": 54107,
+    "httpStatusMessage": "OK",
+    "llmResponsePayload": [
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [{ "text": "huge content" }]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.26",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [{ "text": " huge content" }]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [{ "text": "" }]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [
+                {
+                  "text": "%** rate for parts from Original Equipment Manufacturer (OMXYZ) sources. This indicates Market parts are *2.7 times more likely* to fail out of the box.\n    *   *Shipping Location:* Specific shipping  location, **D"
+                }
+              ]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": " "
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [{ "text": "huge content" }]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [{ "text": "huge string" }]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [{ "text": "nnnnn" }]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [{ "text": " yyyy" }]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [
+                {
+                  "text": " for partnumb: Trrrrr\",\n    \"description\": \"Comparison of Out of Failure rates for across  shipping locations.\",\n    \"chart_type\": \"bar\",\n    \"data\": {"
+                }
+              ]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [
+                {
+                  "text": "\n        \"labels\": [\n            \" Market Purchase\",\n            \"Out-of-Warranty Part\",\n            \"Shipped from DALLA\",\n            \"Shipped from ATLAN\",\n            \" Purchase (Baseline)\"\n        ],\n        \"datasets\": [\n            {\n"
+                }
+              ]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [
+                {
+                  "text": "                \"name\": \"Failure Rate (%)\",\n                \"values\": [\n                    30.0,\n                    30.0,\n                    30.0,\n                    25.0,\n                    11.3\n                ]\n            }\n        ]\n    },\n"
+                }
+              ]
+            }
+          }
+        ],
+        "usageMetadata": { "trafficType": "ON_DEMAND" },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": ""
+      },
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [
+                {
+                  "text": "    \"chart_config\": {\n        \"x_axis_title\": \"Risk Factor\",\n        \"y_axis_title\": \"failure Rate (%)\",\n        \"color_scheme\": \"viridis\",\n        \"show_legend\": true\n    }\n}\n```"
+                }
+              ]
+            },
+            "finishReason": "STOP"
+          }
+        ],
+        "usageMetadata": {
+          "promptTokenCount": 2391,
+          "candidatesTokenCount": 2692,
+          "totalTokenCount": 7804,
+          "trafficType": "ON_DEMAND",
+          "promptTokensDetails": [
+            {
+              "modality": "TEXT",
+              "tokenCount": 1391
+            }
+          ],
+          "candidatesTokensDetails": [
+            {
+              "modality": "TEXT",
+              "tokenCount": 2192
+            }
+          ],
+          "thoughtsTokenCount": 4221
+        },
+        "modelVersion": "gemini-2.5-pro",
+        "createTime": "2025-09-22T03:04:09.267781Z",
+        "responseId": "  "
+      }
+    ],
+    "httpStatusCode": 200
+  }
+}
