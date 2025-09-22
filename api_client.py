@@ -35,7 +35,8 @@ class APIClient:
             # Create the payload according to the specified structure
             payload = self._create_payload(user_prompt, chart_type)
             
-            # Make POST request
+            # TEMPORARY: Use mock request for testing - change back to self._make_request(payload) when ready
+            # response = self.make_mock_request(payload)
             response = self._make_request(payload)
             
             # Parse the response
@@ -63,14 +64,11 @@ class APIClient:
     def _create_payload(self, user_prompt: str, chart_type: Optional[str] = None) -> Dict[str, Any]:
         """Create the payload structure as specified"""
         
-        # Create enhanced prompt for data generation
-        enhanced_prompt = self._create_data_prompt(user_prompt, chart_type)
-        
         payload = {
             "PROJECT": "Chart Generator",
             "CONTEXT": "Generate interactive chart data based on user request",
             "INJECTION": {
-                "INPUT": enhanced_prompt
+                "INPUT": user_prompt
             },
             "injection": {
                 "temperature": str(self.config.temperature),
@@ -108,59 +106,22 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f"API request failed: {str(e)}")
     
-    def _create_data_prompt(self, user_prompt: str, chart_type: Optional[str] = None) -> str:
-        """Create an enhanced prompt for data generation"""
+    def make_mock_request(self, payload: Dict[str, Any]) -> str:
+        """Load mock response from response.json for testing"""
         
-        chart_instruction = ""
-        if chart_type:
-            chart_instruction = f"The chart type should be: {chart_type}"
-        
-        enhanced_prompt = f"""
-You are a data visualization assistant. Based on the user's request, generate realistic data and provide chart configuration.
-
-User Request: {user_prompt}
-{chart_instruction}
-
-CHART TYPE SELECTION RULES:
-- If user mentions "pie chart" or "pie" → use "pie"
-- If user mentions "line chart", "line graph", "trend", "over time" → use "line"  
-- If user mentions "bar chart", "bar graph", "comparison" → use "bar"
-- If user mentions "scatter plot", "correlation", "relationship" → use "scatter"
-- If unclear, choose the most appropriate type for the data
-
-Please provide your response in the following JSON format:
-{{
-    "title": "Chart title",
-    "description": "Brief description of the data",
-    "chart_type": "bar|line|pie|scatter",
-    "data": {{
-        "labels": ["label1", "label2", "label3"],
-        "datasets": [{{
-            "name": "Dataset Name",
-            "values": [10, 20, 30]
-        }}]
-    }},
-    "chart_config": {{
-        "x_axis_title": "X-axis label",
-        "y_axis_title": "Y-axis label",
-        "color_scheme": "viridis|plotly|blues",
-        "show_legend": true
-    }}
-}}
-
-CRITICAL: The chart_type field must EXACTLY match what the user requested. If they said "pie chart", use "pie". If they said "line chart", use "line".
-
-Important guidelines:
-1. Generate realistic, relevant data (5-20 data points)
-2. ALWAYS set chart_type correctly based on user request
-3. Provide meaningful labels and titles
-4. Ensure data makes sense for the requested topic
-5. Use proper JSON formatting
-
-Response:
-"""
-        
-        return enhanced_prompt
+        try:
+            import os
+            response_file = os.path.join(os.path.dirname(__file__), 'response.json')
+            with open(response_file, 'r', encoding='utf-8') as f:
+                test_response = json.load(f)
+            if self.config.debug:
+                print("🧪 Using mock response from response.json")
+            return test_response
+        except Exception as e:
+            if self.config.debug:
+                print(f"❌ Error loading mock response: {e}")
+            raise Exception(f"Failed to load mock response from response.json: {str(e)}")
+    
     
     def _parse_response(self, response: Any, user_prompt: str = "", chart_type: Optional[str] = None) -> Dict[str, Any]:
         """Parse API response and extract structured data from prediction field"""
