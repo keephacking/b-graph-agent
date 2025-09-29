@@ -327,12 +327,20 @@ def main():
     # Main chat interface
     st.header("💬 Chat with API")
     
+    # Debug information
+    if st.checkbox("🔍 Debug Mode", help="Show debug information"):
+        st.write("**Debug Info:**")
+        st.write(f"- App initialized: {app.initialized}")
+        st.write(f"- Messages in history: {len(st.session_state.get('messages', []))}")
+        st.write(f"- Selected chart type: {chart_type}")
+        st.write(f"- API URL: {app.config.api_url if app.config else 'Not loaded'}")
+    
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "👋 Hi! I'm your AI chart generator. Tell me what kind of chart you'd like to create!\n\n**Examples:**\n- *Create a pie chart showing market share*\n- *Generate monthly sales trends as a line chart*\n- *Show quarterly revenue comparison*"
+                "content": "👋 Hi! I'm your AI chart generator. Tell me what kind of chart you'd like to create!\n\n**Examples:**\n- *Create a pie chart showing market share*\n- *Generate monthly sales trends as a line chart*\n- *Show quarterly revenue comparison*\n\n💡 **Note:** If the chat input becomes unresponsive after your first message, please refresh the page. This is a known issue we're working to resolve."
             }
         ]
     
@@ -349,8 +357,10 @@ def main():
                 if response_data:
                     app.display_chart_info(chart_info["html_path"], response_data)
     
-    # Chat input
-    if prompt := st.chat_input("Describe the chart you want to create..."):
+    # Chat input - ensure it's always available
+    prompt = st.chat_input("Describe the chart you want to create...")
+    
+    if prompt:
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         
@@ -358,58 +368,102 @@ def main():
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        # Generate response
+        # Generate response with better error handling
         with st.chat_message("assistant"):
-            # Process the request
-            result = app.process_chart_request(prompt, chart_type)
+            try:
+                # Process the request
+                result = app.process_chart_request(prompt, chart_type)
+                
+                if result and result[0]:  # If successful
+                    html_path, api_response = result
+                    
+                    # Success message
+                    chart_type_display = api_response.get('chart_type', 'Unknown').title()
+                    analysis_available = api_response.get('prediction_analysis') is not None
+                    
+                    success_message = f"""
+                    🎉 **Chart Generated Successfully!**
+                    
+                    📊 **Chart Type:** {chart_type_display}
+                    📈 **Data Points:** {len(api_response.get('data', {}).get('labels', []))}
+                    💾 **Title:** {api_response.get('title', 'Generated Chart')}
+                    {f"🧠 **AI Analysis:** Available below" if analysis_available else ""}
+                    
+                    Your interactive chart has been created and saved!
+                    """
+                    
+                    st.markdown(success_message)
+                    
+                    # Display chart info
+                    app.display_chart_info(html_path, api_response)
+                    
+                    # Add to chat history with chart info
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": success_message,
+                        "chart_info": {
+                            "html_path": html_path,
+                            "api_response": api_response
+                        }
+                    })
+                
+                else:  # If failed
+                    error_message = """
+                    ❌ **Chart Generation Failed**
+                    
+                    Please try:
+                    - Being more specific about your data requirements
+                    - Checking your internet connection
+                    - Trying a different chart type
+                    
+                    Example: *"Create a pie chart showing smartphone market share with 5-6 brands"*
+                    """
+                    
+                    st.markdown(error_message)
+                    st.session_state.messages.append({"role": "assistant", "content": error_message})
             
-            if result[0]:  # If successful
-                html_path, api_response = result
+            except Exception as e:
+                # Handle any unexpected errors to prevent chat input from breaking
+                error_message = f"""
+                ❌ **Unexpected Error Occurred**
                 
-                # Success message
-                chart_type_display = api_response.get('chart_type', 'Unknown').title()
-                analysis_available = api_response.get('prediction_analysis') is not None
+                Error details: {str(e)}
                 
-                success_message = f"""
-                🎉 **Chart Generated Successfully!**
+                Please try again with a different request. The chat input should remain functional.
                 
-                📊 **Chart Type:** {chart_type_display}
-                📈 **Data Points:** {len(api_response.get('data', {}).get('labels', []))}
-                💾 **Title:** {api_response.get('title', 'Generated Chart')}
-                {f"🧠 **AI Analysis:** Available below" if analysis_available else ""}
-                
-                Your interactive chart has been created and saved!
+                💡 **Tip:** Try a simpler request like "Create a bar chart with sample data"
                 """
                 
-                st.markdown(success_message)
-                
-                # Display chart info
-                app.display_chart_info(html_path, api_response)
-                
-                # Add to chat history with chart info
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": success_message,
-                    "chart_info": {
-                        "html_path": html_path,
-                        "api_response": api_response
-                    }
-                })
-            
-            else:  # If failed
-                error_message = """
-                ❌ **Chart Generation Failed**
-                
-                Please try:
-                - Being more specific about your data requirements
-                - Checking your internet connection
-                - Trying a different chart type
-                
-                Example: *"Create a pie chart showing smartphone market share with 5-6 brands"*
-                """
-                
-                st.markdown(error_message)
+                st.error(error_message)
                 st.session_state.messages.append({"role": "assistant", "content": error_message})
+                
+                # Force rerun to ensure chat input remains available
+                st.rerun()
+    
+    # Chat controls
+    st.divider()
+    col1, col2, col3 = st.columns([1, 1, 2])
+    
+    with col1:
+        if st.button("🔄 Reset Chat", help="Clear all messages and reset the chat"):
+            st.session_state.messages = [
+                {
+                    "role": "assistant",
+                    "content": "👋 Chat has been reset! Tell me what kind of chart you'd like to create!"
+                }
+            ]
+            st.rerun()
+    
+    with col2:
+        if st.button("🧪 Test Input", help="Test if chat input is working"):
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": "✅ Chat input is working! You can continue chatting normally."
+            })
+            st.rerun()
+    
+    with col3:
+        st.info("💡 If chat input stops working, try the Reset Chat button")
     
     # Footer
     st.divider()
